@@ -1,0 +1,5 @@
+On a workstation/cluster without task scheduler, run with command:
+
+mpiexec -n <N> <lammps_executable_path> -in in.lammps 
+
+where N is the number of available cores on a node.

@@ -1,0 +1,67 @@
+###################################################
+# Low pressure value (substitute in with sed)
+variable pvalue equal PRESSURE_VALUE
+variable rate_inverse equal RATEINVERSE_VALUE
+variable fname  equal FNAME_VALUE
+
+# Initialization
+log             320bead-40chain-CGNLB.log
+units           real
+atom_style      angle
+boundary        p p p 
+
+####################################################
+# Forcefield parameters
+
+bond_style      table linear 10000
+pair_style      table linear 1001 
+angle_style     table linear 1001
+
+read_data       320bead-40chain-CGNLB.data
+
+bond_coeff      1 bond.table.CGNLB EE
+pair_coeff      1 1 pair.table.CGNLB EE
+angle_coeff     1 angle.table.CGNLB EEE
+
+neighbor        2.0 bin
+neigh_modify    delay 0 every 1 check yes
+special_bonds   lj/coul 0.0 0.0 1.0 
+
+####################################################
+# Run in NVE dynamics.
+timestep        5
+fix             0 all momentum 1 linear 1 1 1 angular
+thermo_style    custom step temp press ke pe enthalpy vol lx ly lz pxx pyy pzz
+thermo          100
+
+fix             1 all nve/limit 4.0
+fix             2 all temp/rescale 1 480 480 5.0 1.0
+run             100000
+unfix 1
+unfix 2
+
+######################################################
+# Equillibrate the system in NPT ensemble at 480K and 1atm.
+fix             1 all npt temp 480 480 500 aniso 1 1 1000
+run             1000000
+unfix 1
+
+######################################################
+# Ramp down from 480K to 40K at rate 0.5K/ns, or 5e-7K/fs.
+reset_timestep  0
+
+variable        l1 equal lx
+variable        l2 equal ly
+variable        l3 equal lz
+variable        vs equal vol
+variable        tt equal temp
+
+# Data file are already equilibrated in NVE ensemble at 300K.
+fix             1 all npt temp 480 40 500 aniso 1 1 1000
+fix             2 all ave/time 1 400000 400000 v_tt v_l1 v_l2 v_l3 v_vs ave one file system_size.txt
+dump            1 all custom 400000 cgnlb-ramp.lammpstrj id mol type x y z
+dump            2 all custom 400000 cgnlb-ramp-unwrapped.lammpstrj id mol type xu yu zu
+dump_modify     1 sort id
+dump_modify     2 sort id
+run             176000000
+
